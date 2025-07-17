@@ -1,21 +1,32 @@
 package io.spoud.azure.auth.certificate;
 
 import com.microsoft.aad.msal4j.*;
+import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 public class TestTheLib {
 
-    public static void main(String[] args) throws Exception {
+    @Test
+    public void simpleCall() throws Exception {
         // Azure App Registration details
         String clientId = "3cf8283b-c4dd-47db-ac29-7cd4226102bb";
         String tenantId = "b52245db-4800-4792-975a-1d9ed49512f2";
@@ -27,8 +38,8 @@ public class TestTheLib {
         String scope = "api://bd621c7c-d51d-4f86-a3fa-5d842c63dfce/.default";
 
         // Load certificate
-        X509Certificate certificate = loadCertificateFromResources(certPath);
-        PrivateKey privateKey = loadPrivateKeyFromResources(privateKeyPath);
+        X509Certificate certificate = loadCertificateFromPath(certPath);
+        PrivateKey privateKey = loadPrivateKeyFromPath(privateKeyPath);
 
         // Build client credential
         IClientCredential credential = ClientCredentialFactory.createFromCertificate(privateKey, certificate);
@@ -57,30 +68,30 @@ public class TestTheLib {
         String header = new String(decoder.decode(chunks[0]));
         String payload = new String(decoder.decode(chunks[1]));
 
-        System.out.println(header);
-        System.out.println(payload);
+        assertNotNull(header);
+        assertNotNull(payload);
     }
 
-    private static X509Certificate loadCertificateFromResources(String resourcePath) throws Exception {
-        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
-            if (in == null) throw new IllegalArgumentException("Certificate not found: " + resourcePath);
+    private X509Certificate loadCertificateFromPath(String certificatePath) throws CertificateException, IOException {
+        Path path = Paths.get(certificatePath);
+        try (InputStream inputStream = Files.newInputStream(path)) {
             CertificateFactory factory = CertificateFactory.getInstance("X.509");
-            return (X509Certificate) factory.generateCertificate(in);
+            return (X509Certificate) factory.generateCertificate(inputStream);
         }
     }
 
-    private static PrivateKey loadPrivateKeyFromResources(String resourcePath) throws Exception {
-        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
-            if (in == null) throw new IllegalArgumentException("Private key not found: " + resourcePath);
-            String key = new String(in.readAllBytes());
+    private PrivateKey loadPrivateKeyFromPath(String privateKeyPath) throws IOException, InvalidKeySpecException, NoSuchAlgorithmException {
+        Path path = Paths.get(privateKeyPath);
+        try (InputStream inputStream = Files.newInputStream(path)) {
+            String key = new String(inputStream.readAllBytes());
             String privateKeyPem = key.replace("-----BEGIN PRIVATE KEY-----", "")
                     .replace("-----END PRIVATE KEY-----", "")
                     .replaceAll("\\s+", "");
 
             byte[] keyBytes = Base64.getDecoder().decode(privateKeyPem);
-            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            return kf.generatePrivate(spec);
+            PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(keyBytes);
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            return keyFactory.generatePrivate(pkcs8EncodedKeySpec);
         }
     }
 }

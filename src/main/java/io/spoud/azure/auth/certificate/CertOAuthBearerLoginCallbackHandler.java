@@ -71,7 +71,6 @@ public class CertOAuthBearerLoginCallbackHandler implements AuthenticateCallback
     /*
      * Package-visible for testing.
      */
-
     void init(AccessTokenRetriever accessTokenRetriever, AccessTokenValidator accessTokenValidator) {
         this.accessTokenRetriever = accessTokenRetriever;
         this.accessTokenValidator = accessTokenValidator;

@@ -1,0 +1,74 @@
+name: Release on Tag
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push the version bump
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required to push back changes
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Extract version from POM
+        id: version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          CLEAN_VERSION=${VERSION/-SNAPSHOT/}
+          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Validate tag matches POM version
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Tag: $TAG_NAME"
+          echo "Version from POM: $VERSION"
+          if [ "$TAG_NAME" != "$VERSION" ]; then
+            echo "❌ Tag and POM version don't match. Aborting release."
+            exit 1
+          fi
+
+      - name: Build with Maven
+        run: mvn clean package
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          files: target/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump to next snapshot version
+        run: |
+          # Get current version from POM
+          VERSION=${{ steps.version.outputs.version }}
+          echo "Current version: $VERSION"
+
+          # Split into major/minor/patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEXT_PATCH=$((PATCH + 1))
+          NEXT_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-SNAPSHOT"
+          echo "Bumping to: $NEXT_VERSION"
+
+          # Use Maven to set new version
+          mvn versions:set -DnewVersion=$NEXT_VERSION -DgenerateBackupPoms=false
+
+          # Commit and push the new version
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git commit -am "Bump version to $NEXT_VERSION"
+          git push origin main

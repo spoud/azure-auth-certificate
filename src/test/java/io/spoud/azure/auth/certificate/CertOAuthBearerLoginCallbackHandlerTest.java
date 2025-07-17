@@ -13,6 +13,7 @@ import java.util.Map;
 
 import static io.spoud.azure.auth.certificate.CertOAuthBearerLoginCallbackHandler.*;
 import static org.apache.kafka.common.config.SaslConfigs.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 
 class CertOAuthBearerLoginCallbackHandlerTest {
@@ -50,6 +51,6 @@ class CertOAuthBearerLoginCallbackHandlerTest {
 
         OAuthBearerToken token = oAuthBearerTokenCallback.token();
 
-        System.out.println(token);
+        assertNotNull(token);
     }
 }
