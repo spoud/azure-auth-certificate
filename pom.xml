@@ -4,7 +4,7 @@
 
     <groupId>io.spoud.azure.auth.certificate</groupId>
     <artifactId>azure-auth-certificate</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.1-SNAPSHOT</version>
 
     <name>azure-auth-certificate</name>
     <packaging>jar</packaging>
