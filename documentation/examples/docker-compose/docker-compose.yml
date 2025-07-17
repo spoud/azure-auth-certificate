@@ -1,0 +1,76 @@
+---
+services:
+
+  broker:
+    image: confluentinc/cp-kafka:7.9.0
+    hostname: big-host-1.datadisorder.dev
+    container_name: broker
+    ports:
+      - "9093:9093"
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,OIDC:SASL_SSL'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://big-host-1.datadisorder.dev:29092,PLAINTEXT_HOST://big-host-1.datadisorder.dev:9092,OIDC://big-host-1.datadisorder.dev:9093'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@big-host-1.datadisorder.dev:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://big-host-1.datadisorder.dev:29092,CONTROLLER://big-host-1.datadisorder.dev:29093,PLAINTEXT_HOST://0.0.0.0:9092,OIDC://0.0.0.0:9093'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAINTEXT
+      KAFKA_SSL_KEY_PASSWORD: confluentkeystorestorepass
+      KAFKA_SSL_KEYSTORE_LOCATION: /var/ssl/private/kafka_broker.keystore.jks
+      KAFKA_SSL_KEYSTORE_PASSWORD: confluentkeystorestorepass
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /var/ssl/private/kafka_broker.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: confluenttruststorepass
+
+      #Doesn't work if I put it as KAFKA_LISTENER_NAME_OIDC_SASL_OAUTHBEARER_SUB_CLAIM_NAME
+      KAFKA_SASL_OAUTHBEARER_SUB_CLAIM_NAME: appid
+
+      KAFKA_LISTENER_NAME_OIDC_SASL_ENABLED_MECHANISMS: OAUTHBEARER
+      KAFKA_LISTENER_NAME_OIDC_SASL_OAUTHBEARER_JWKS_ENDPOINT_URL: $JWKS_ENDPOINT_URL
+      KAFKA_LISTENER_NAME_OIDC_OAUTHBEARER_SASL_JAAS_CONFIG: org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;
+      KAFKA_LISTENER_NAME_OIDC_SASL_OAUTHBEARER_EXPECTED_AUDIENCE: $OIDC_AUD
+      KAFKA_LISTENER_NAME_OIDC_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerValidatorCallbackHandler
+
+
+      KAFKA_LOG4J_LOGGERS: 'org.apache.kafka=INFO,org.apache.kafka.raft=WARN,org.apache.kafka.timeline=WARN,org.apache.kafka.deferred=WARN,org.apache.kafka.image=WARN,org.apache.kafka.controller=WARN'
+      CLUSTER_ID: $CLUSTERID
+      KAFKA_AUTHORIZER_CLASS_NAME: 'org.apache.kafka.metadata.authorizer.StandardAuthorizer'
+
+      # We have to configure the user for the broker as super user if we want to set this one as false
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: true
+      KAFKA_SUPER_USERS: "User:if-you-want-one"
+      CLASSPATH: "/tmp/extraJars/confluent-oauth-extensions-1.1-JDK11-SNAPSHOT.jar"
+
+    volumes:
+      - ./certs:/var/ssl/private/
+      - ./extraJars:/tmp/extraJars
+
+
+  client-cert:
+    hostname: client-cert
+    container_name: client-cert
+    image: confluentinc/cp-kafka:7.9.0
+    entrypoint: /bin/sh -c
+    command:
+      - sleep infinity
+    volumes:
+      - ./certs:/var/ssl/private/
+      - ./cert-client.properties:/tmp/client.properties
+      - ${PWD}/../../../target:/tmp/extraJars
+      - ${PWD}/../../../src/test/resources/certs/Example_Name:/var/identity/certs
+      - ./client.log4j.properties:/tmp/client.log4j.properties
+    environment:
+      KAFKA_SASL_ENABLED_MECHANISMS: OAUTHBEARER
+      KAFKA_LOG4J_OPTS: "-Dlog4j.configuration=file:/tmp/client.log4j.properties"
+      CLASSPATH: "/tmp/extraJars/azure-auth-certificate-1.0-SNAPSHOT-jar-with-dependencies.jar"
+
